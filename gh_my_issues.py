@@ -52,7 +52,7 @@ url        : {self.url}
 
 def print_issues(issues: list[Issue]):
     for i, t in enumerate(issues):
-        record = f"""# {i:<4}: {t.title}"""
+        record = f"""# {i:<4}| {str(t.repo):<30}| {t.title:<30}"""
         print(record)
 
 
