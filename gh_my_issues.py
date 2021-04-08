@@ -2,13 +2,10 @@
 from dataclasses import dataclass
 import json
 import os
-import pprint
 import subprocess
 from subprocess import PIPE
 import sys
 from typing import Any, Callable, List, Optional, Tuple, Union
-
-import fire
 
 
 @dataclass
@@ -52,7 +49,7 @@ url        : {self.url}
 
 def print_issues(issues: list[Issue]):
     for i, t in enumerate(issues):
-        record = f"""# {i:<4}| {str(t.repo):<30}| {t.title:<30}"""
+        record = f"""{i:<4}: {t.title:<30} ({str(t.repo)})"""
         print(record)
 
 
@@ -112,7 +109,7 @@ def cmd_close(index: Optional[int] = None):
     index = int(index)
     target = issues[index]
     print(str(target))
-    if ask("Are you ok to close? (y/N): "):
+    if prompt("Are you ok to close? (y/N): "):
         subprocess.run(["gh", "issue", "close", target.url])
     else:
         print("Aborted")
@@ -134,7 +131,7 @@ def cmd_new():
     )
 
 
-def ask(msg: Optional[str] = None) -> bool:
+def prompt(msg: Optional[str] = None) -> bool:
     msg = msg or "Are you ok? (y/N): "
     rep = input(msg).lower()
     return bool(rep) and rep[0] == "y"
@@ -174,26 +171,4 @@ def main():
 
 
 if __name__ == "__main__":
-    fire.Fire(main)
-#  if [[ $subcmd == "list" ]]; then
-#      gh api graphql -f query='
-#      query {
-#      search(first: 100, type: ISSUE, query: "assignee:tamuhey is:open") {
-#          issueCount
-#          pageInfo {
-#          hasNextPage
-#          endCursor
-#          }
-#          edges {
-#          node {
-#              ... on Issue {
-#              createdAt
-#              title
-#              url,
-#              }
-#          }
-#          }
-#      }
-#      }
-#      ' |  jq -r '.data.search.edges | map(.node) | .[]  | [.title, .url]'
-#  fi
+    main()
