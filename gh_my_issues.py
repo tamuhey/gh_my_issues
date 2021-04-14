@@ -14,7 +14,7 @@ class Repository:
     name: str
 
     @classmethod
-    def from_resp(cls, dat: dict[str, Any]) -> "Repository":
+    def from_api_resp(cls, dat: dict[str, Any]) -> "Repository":
         owner = dat["owner"]["name"]
         name = dat["name"]
         return cls(owner, name)
@@ -35,7 +35,7 @@ class Issue:
         created_at = dat["createdAt"]
         title = dat["title"]
         url = dat["url"]
-        repo = Repository.from_resp(dat["repository"])
+        repo = Repository.from_api_resp(dat["repository"])
         return Issue(created_at=created_at, title=title, url=url, repo=repo)
 
     def __str__(self) -> str:
@@ -56,7 +56,7 @@ def print_issues(issues: list[Issue]):
 issues: list[Issue] = []
 
 
-def _list():
+def _update_issues():
     cmd = """
 gh api graphql -f query='
         query {
@@ -99,7 +99,7 @@ gh api graphql -f query='
 
 
 def cmd_list():
-    _list()
+    _update_issues()
     print_issues(issues)
 
 
@@ -166,7 +166,7 @@ def main():
                 cmds[0](*cmds[1])
             except Exception as e:
                 print(e, file=sys.stderr)
-        else:
+        elif cmds:
             print("Unknown command: ", cmds, file=sys.stderr)
 
 
