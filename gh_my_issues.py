@@ -98,24 +98,34 @@ gh api graphql -f query='
         issues.append(Issue.from_resp(issue["node"]))
 
 
+# `cmd_{x}` defines the command `x`
+
+
 def cmd_list():
+    """(list) List all issues"""
     _update_issues()
     print_issues(issues)
 
 
 def cmd_close(index: Optional[int] = None):
+    """(close {id}) Close an issue specified by index"""
     if index is None:
         index = int(input("Close which?: "))
     index = int(index)
     target = issues[index]
     print(str(target))
-    if prompt("Are you ok to close? (y/N): "):
+    if (
+        (rep := input("Are you ok to close? (y/N): ").lower().strip())
+        and rep
+        and rep[0] == "y"
+    ):
         subprocess.run(["gh", "issue", "close", target.url])
     else:
         print("Aborted")
 
 
 def cmd_detail(index: Optional[int] = None):
+    """(detail {id}) Show details of an issue specified by index"""
     if index is None:
         index = int(input("Which issue to show detail? (number) "))
     index = int(index)
@@ -123,6 +133,7 @@ def cmd_detail(index: Optional[int] = None):
 
 
 def cmd_new():
+    """(new) Create new issue"""
     user = os.environ["GITHUB_USERNAME"]
     repo = os.environ["TODO_REPO"]
     subprocess.run(
@@ -131,20 +142,31 @@ def cmd_new():
     )
 
 
-def prompt(msg: Optional[str] = None) -> bool:
-    msg = msg or "Are you ok? (y/N): "
-    rep = input(msg).lower()
-    return bool(rep) and rep[0] == "y"
+def cmd_help(subcmd: Optional[str]):
+    """(help (alias)?) Help command"""
+    if subcmd.lower().strip() == "alias":
+        for k, v in ALIASES.items():
+            print(f"{k:<5} -> {v}")
+    else:
+        for k, f in CMDs.items():
+            doc = f.__doc__
+            print(f"{k:<20}: {doc}")
 
 
-CMDs = {"list": cmd_list, "close": cmd_close, "detail": cmd_detail, "new": cmd_new}
-ALIASES = {"l": "list", "c": "close", "n": "new"}
+CMDs = {
+    "list": cmd_list,
+    "close": cmd_close,
+    "detail": cmd_detail,
+    "new": cmd_new,
+    "help": cmd_help,
+}
+ALIASES = {"l": "list", "c": "close", "n": "new", "h": "help", "d": "detail"}
 
 
 def read_cmd() -> Union[tuple[Callable, List[str]], str]:
     try:
         inputs = input("> ")
-    except EOFError:
+    except (EOFError, KeyboardInterrupt):
         exit(0)
     cmdl = inputs.split(" ")
     cmdstr, args = cmdl[0], cmdl[1:]
