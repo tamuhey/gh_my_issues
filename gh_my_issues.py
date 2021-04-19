@@ -5,8 +5,7 @@ import os
 import subprocess
 from subprocess import PIPE
 import sys
-from typing import Any, Callable, List, Optional, Tuple, Union
-
+from typing import Any, Callable, List, Optional, Union
 
 @dataclass
 class Repository:
@@ -36,7 +35,7 @@ class Issue:
         title = dat["title"]
         url = dat["url"]
         repo = Repository.from_api_resp(dat["repository"])
-        return Issue(created_at=created_at, title=title, url=url, repo=repo)
+        return cls(created_at=created_at, title=title, url=url, repo=repo)
 
     def __str__(self) -> str:
         return f"""
