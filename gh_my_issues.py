@@ -7,6 +7,7 @@ from subprocess import PIPE
 import sys
 from typing import Any, Callable, List, Optional, Union
 
+
 @dataclass
 class Repository:
     owner: str
@@ -113,11 +114,7 @@ def cmd_close(index: Optional[int] = None):
     index = int(index)
     target = issues[index]
     print(str(target))
-    if (
-        (rep := input("Are you ok to close? (y/N): ").lower().strip())
-        and rep
-        and rep[0] == "y"
-    ):
+    if (rep := input("Close? (y/N): ").lower().strip()) and rep and rep[0] == "y":
         subprocess.run(["gh", "issue", "close", target.url])
     else:
         print("Aborted")
