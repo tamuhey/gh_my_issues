@@ -1,4 +1,9 @@
 #!/usr/bin/env python3.9
+
+# ========== configuration ==========
+USERNAME = "tamuhey"
+# ===================================
+
 from dataclasses import dataclass
 import json
 import os
@@ -56,40 +61,54 @@ def print_issues(issues: list[Issue]):
 issues: list[Issue] = []
 
 
-def _update_issues():
-    cmd = """
-gh api graphql -f query='
-        query {
-        search(first: 100, type: ISSUE, query: "assignee:tamuhey is:open") {
-            issueCount
-            pageInfo {
-            hasNextPage
-            endCursor
-            }
-            edges {
-            node {
-                ... on Issue {
-                createdAt
-                title
-                url,
-                bodyText,
-                repository {
-                    owner {
-                        ... on Organization {
-                            name
-                        }
-                        ... on User {
-                            name: login
-                        }
-                    },
-                    name,
+QUERY = """
+query($target: String!) {
+search(first: 100, type: ISSUE, query: $target) {
+    issueCount
+    pageInfo {
+    hasNextPage
+    endCursor
+    }
+    edges {
+    node {
+        ... on RepositoryNode {
+            repository {
+                owner {
+                    ... on Organization {
+                        name
+                    }
+                    ... on User {
+                        name: login
+                    }
                 },
-                }
-            }
-            }
+                name,
+            },
         }
-        }'
-    """
+        ... on UniformResourceLocatable {
+            url,
+        }
+        ... on Issue {
+            createdAt
+            title
+            url,
+            bodyText,
+        }
+        ... on PullRequest {
+            createdAt
+            title
+            url,
+            bodyText,
+        }
+    }
+    }
+}
+}
+"""
+
+
+def _update_issues():
+    target = f'"assignee:{USERNAME} is:open"'
+    cmd = f"gh api graphql -f query='{QUERY}' -f target={target}"
     ret = subprocess.run(cmd, shell=True, stdout=PIPE, check=True)
     dat = json.loads(ret.stdout.decode())
 
