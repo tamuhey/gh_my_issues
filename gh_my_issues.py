@@ -10,7 +10,7 @@ import os
 import subprocess
 from subprocess import PIPE
 import sys
-from typing import Any, Callable, List, Optional, Union
+from typing import Any, Callable, ClassVar, List, Optional, Union
 
 
 @dataclass
@@ -29,14 +29,15 @@ class Repository:
 
 
 @dataclass
-class Issue:
+class IssuePRBase:
     created_at: str
     title: str
     url: str
     repo: Repository
+    typename: ClassVar[str] = ""
 
     @classmethod
-    def from_resp(cls, dat: dict[str, Any]) -> "Issue":
+    def from_resp(cls, dat: dict[str, Any]):
         created_at = dat["createdAt"]
         title = dat["title"]
         url = dat["url"]
@@ -44,7 +45,9 @@ class Issue:
         return cls(created_at=created_at, title=title, url=url, repo=repo)
 
     def __str__(self) -> str:
+        assert self.typename
         return f"""
+Type       : {self.typename}
 Title      : {self.title}
 Repo       : {self.repo}
 Created at : {self.created_at}
@@ -52,13 +55,24 @@ url        : {self.url}
 """
 
 
-def print_issues(issues: list[Issue]):
+@dataclass
+class Issue(IssuePRBase):
+    typename: ClassVar[str] = "Issue"
+
+
+@dataclass
+class PullRequest(IssuePRBase):
+    typename: ClassVar[str] = "PullRequest"
+
+
+NodeType = Union[Issue, PullRequest]
+nodes: list[NodeType] = []
+
+
+def print_issues(issues: list[NodeType]):
     for i, t in enumerate(issues):
         record = f"""{i:<4}: {t.title:<30} ({str(t.repo)})"""
         print(record)
-
-
-issues: list[Issue] = []
 
 
 QUERY = """
@@ -92,12 +106,14 @@ search(first: 100, type: ISSUE, query: $target) {
             title
             url,
             bodyText,
+            __typename,
         }
         ... on PullRequest {
             createdAt
             title
             url,
             bodyText,
+            __typename,
         }
     }
     }
@@ -108,16 +124,26 @@ search(first: 100, type: ISSUE, query: $target) {
 
 def _update_issues():
     target = f'"assignee:{USERNAME} is:open"'
-    cmd = f"gh api graphql -f query='{QUERY}' -f target={target}"
+    cmd = f"gh api graphql -f query='{QUERY}' -F target={target}"
     ret = subprocess.run(cmd, shell=True, stdout=PIPE, check=True)
     dat = json.loads(ret.stdout.decode())
 
-    issues.clear()
-    for issue in dat["data"]["search"]["edges"]:
-        node = issue["node"]
-        if not node:
-            continue
-        issues.append(Issue.from_resp(node))
+    nodes.clear()
+    try:
+        for edge in dat["data"]["search"]["edges"]:
+            node = edge["node"]
+            if not node:
+                continue
+            typename = node["__typename"]
+            if typename == Issue.typename:
+                kls = Issue
+            elif typename == PullRequest.typename:
+                kls = PullRequest
+            else:
+                raise ValueError(f"Unreachable: {edge}")
+            nodes.append(kls.from_resp(node))
+    except KeyError as e:
+        raise ValueError(f"Unexpected response: {dat}") from e
 
 
 # `cmd_{x}` defines the command `x`
@@ -126,7 +152,7 @@ def _update_issues():
 def cmd_list():
     """(list) List all issues"""
     _update_issues()
-    print_issues(issues)
+    print_issues(nodes)
 
 
 def cmd_close(index: Optional[int] = None):
@@ -134,7 +160,10 @@ def cmd_close(index: Optional[int] = None):
     if index is None:
         index = int(input("Close which?: "))
     index = int(index)
-    target = issues[index]
+    target = nodes[index]
+    if not isinstance(target, Issue):
+        print(f"{target.typename} cannot be closed")
+        return
     print(str(target))
     if (rep := input("Close? (y/N): ").lower().strip()) and rep and rep[0] == "y":
         subprocess.run(["gh", "issue", "close", target.url])
@@ -147,7 +176,7 @@ def cmd_detail(index: Optional[int] = None):
     if index is None:
         index = int(input("Which issue to show detail? (number) "))
     index = int(index)
-    print(str(issues[index]))
+    print(str(nodes[index]))
 
 
 def cmd_new():
