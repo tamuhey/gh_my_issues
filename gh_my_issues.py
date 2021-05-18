@@ -1,9 +1,4 @@
 #!/usr/bin/env python3.9
-
-# ========== configuration ==========
-USERNAME = "tamuhey"
-# ===================================
-
 from dataclasses import dataclass
 import json
 import os
@@ -40,8 +35,7 @@ class Issue:
         created_at = dat["createdAt"]
         title = dat["title"]
         url = dat["url"]
-        repo_str = dat["repository"]
-        repo = Repository.from_api_resp(repo_str)
+        repo = Repository.from_api_resp(dat["repository"])
         return cls(created_at=created_at, title=title, url=url, repo=repo)
 
     def __str__(self) -> str:
@@ -62,8 +56,11 @@ def print_issues(issues: list[Issue]):
 issues: list[Issue] = []
 
 
-QUERY = """query($username: String!) {
-        search(first: 100, type: ISSUE, query: "assignee:$username is:open") {
+def _update_issues():
+    cmd = """
+gh api graphql -f query='
+        query {
+        search(first: 100, type: ISSUE, query: "assignee:tamuhey is:open") {
             issueCount
             pageInfo {
             hasNextPage
@@ -71,50 +68,34 @@ QUERY = """query($username: String!) {
             }
             edges {
             node {
-                ... on RepositoryNode {
-                    repository {
-                        owner {
-                            ... on Organization {
-                                name
-                            }
-                            ... on User {
-                                name: login
-                            }
-                        },
-                        name,
-                    },
-                }
-                ... on UniformResourceLocatable {
-                    url,
-                }
                 ... on Issue {
-                    createdAt
-                    title
-                    bodyText,
+                createdAt
+                title
+                url,
+                bodyText,
+                repository {
+                    owner {
+                        ... on Organization {
+                            name
+                        }
+                        ... on User {
+                            name: login
+                        }
+                    },
+                    name,
+                },
                 }
-                ... on PullRequest {
-                    createdAt
-                    title
-                    bodyText,
-                }
-              }
+            }
             }
         }
-        }
-"""
-
-
-def _update_issues():
-    cmd = f"gh api graphql -f query={QUERY} -F username={USERNAME}"
+        }'
+    """
     ret = subprocess.run(cmd, shell=True, stdout=PIPE, check=True)
     dat = json.loads(ret.stdout.decode())
 
     issues.clear()
     for issue in dat["data"]["search"]["edges"]:
-        try:
-            issues.append(Issue.from_resp(issue["node"]))
-        except KeyError as e:
-            raise KeyError(f"Response: {dat}") from e
+        issues.append(Issue.from_resp(issue["node"]))
 
 
 # `cmd_{x}` defines the command `x`
@@ -157,9 +138,9 @@ def cmd_new():
     )
 
 
-def cmd_help(subcmd: Optional[str] = None):
+def cmd_help(subcmd: Optional[str]):
     """(help (alias)?) Help command"""
-    if subcmd and subcmd.lower().strip() == "alias":
+    if subcmd.lower().strip() == "alias":
         for k, v in ALIASES.items():
             print(f"{k:<5} -> {v}")
     else:
