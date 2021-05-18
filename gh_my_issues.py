@@ -114,7 +114,10 @@ def _update_issues():
 
     issues.clear()
     for issue in dat["data"]["search"]["edges"]:
-        issues.append(Issue.from_resp(issue["node"]))
+        node = issue["node"]
+        if not node:
+            continue
+        issues.append(Issue.from_resp(node))
 
 
 # `cmd_{x}` defines the command `x`
